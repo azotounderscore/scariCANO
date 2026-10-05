@@ -233,4 +233,47 @@ class SafHelper(private val context: Context) {
             false
         }
     }
+
+    /**
+     * Saves a file from local path to SAF directory
+     */
+    fun saveFileFromPath(destinationUri: Uri, localPath: String, fileName: String): Boolean {
+        return try {
+            val resolver = context.contentResolver
+            val documentFile = DocumentFile.fromTreeUri(context, destinationUri)
+            
+            // Create new file in destination
+            val newFile = documentFile?.createFile("audio/*", fileName)
+            
+            if (newFile != null) {
+                val inputStream = File(localPath).inputStream()
+                val outputStream = resolver.openOutputStream(newFile.uri)
+                
+                inputStream?.use { input ->
+                    outputStream?.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Gets child URI for a file in a directory
+     */
+    fun getChildUri(parentUri: Uri, fileName: String): Uri? {
+        return try {
+            val documentFile = DocumentFile.fromTreeUri(context, parentUri)
+            val childFile = documentFile?.findFile(fileName)
+            childFile?.uri
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

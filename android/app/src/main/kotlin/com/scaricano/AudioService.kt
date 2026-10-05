@@ -2,7 +2,6 @@ package com.scaricano
 
 import android.app.Notification
 import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -102,144 +101,168 @@ class AudioService : Service(), Player.Listener {
     }
 
     private fun initializeMediaSession() {
-        mediaSession = MediaSession(this, "scariCANO MediaSession").apply {
-            setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
-            setPlaybackState(PlaybackState.Builder()
-                .setState(PlaybackState.STATE_NONE, 0, 1.0f)
-                .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or 
-                        PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
-                .build())
-            
-            setCallback(object : MediaSession.Callback() {
-                override fun onPlay() {
-                    play()
-                }
-                
-                override fun onPause() {
-                    pause()
-                }
-                
-                override fun onSkipToNext() {
-                    next()
-                }
-                
-                override fun onSkipToPrevious() {
-                    previous()
-                }
-                
-                override fun onStop() {
-                    stop()
-                }
-            })
+        mediaSession = MediaSession(this, "scariCANO").apply {
+            setPlaybackState(
+                PlaybackState.Builder()
+                    .setState(PlaybackState.STATE_NONE, 0, 1.0f)
+                    .setActions(
+                        PlaybackState.ACTION_PLAY or
+                        PlaybackState.ACTION_PAUSE or
+                        PlaybackState.ACTION_SKIP_TO_NEXT or
+                        PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackState.ACTION_STOP
+                    )
+                    .build()
+            )
+            isActive = true
         }
     }
 
     private fun startForeground() {
-        val notification = createNotification("scariCANO", "Nessun brano in riproduzione", 0)
+        val notification = createNotification("scariCANO", "Player in esecuzione", false)
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun createNotification(title: String, text: String, progress: Int): Notification {
+    private fun createNotification(title: String, text: String, isPlaying: Boolean): Notification {
         val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val playPauseText = if (isPlaying) "Pausa" else "Play"
         
-        val playPauseIntent = Intent(this, AudioService::class.java).apply {
-            action = if (isPlaying) ACTION_PAUSE else ACTION_PLAY
-        }
-        val playPausePendingIntent = PendingIntent.getService(
-            this, 0, playPauseIntent, 
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
-        val nextIntent = Intent(this, AudioService::class.java).apply {
-            action = ACTION_NEXT
-        }
-        val nextPendingIntent = PendingIntent.getService(
-            this, 1, nextIntent, 
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        
-        val prevIntent = Intent(this, AudioService::class.java).apply {
-            action = ACTION_PREVIOUS
-        }
-        val prevPendingIntent = PendingIntent.getService(
-            this, 2, prevIntent, 
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
-                .setMediaSession(mediaSession?.sessionToken)
-                .setShowActionsInCompactView(0, 1, 2))
-            .addAction(android.R.drawable.ic_media_previous, "Precedente", prevPendingIntent)
-            .addAction(playPauseIcon, if (isPlaying) "Pausa" else "Play", playPausePendingIntent)
-            .addAction(android.R.drawable.ic_media_next, "Successivo", nextPendingIntent)
+            .setAutoCancel(false)
+            .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(
+                android.R.drawable.ic_media_previous,
+                "Precedente",
+                createPendingIntent(ACTION_PREVIOUS)
+            )
+            .addAction(
+                playPauseIcon,
+                playPauseText,
+                createPendingIntent(if (isPlaying) ACTION_PAUSE else ACTION_PLAY)
+            )
+            .addAction(
+                android.R.drawable.ic_media_next,
+                "Successivo",
+                createPendingIntent(ACTION_NEXT)
+            )
+            .addAction(
+                android.R.drawable.ic_media_stop,
+                "Stop",
+                createPendingIntent(ACTION_STOP)
+            )
             .build()
     }
 
-    fun addListener(listener: AudioListener) {
-        listeners.add(listener)
+    private fun createPendingIntent(action: String): PendingIntent {
+        val intent = Intent(this, AudioService::class.java).apply {
+            this.action = action
+        }
+        return PendingIntent.getService(
+            this, 
+            action.hashCode(), 
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
-    fun removeListener(listener: AudioListener) {
-        listeners.remove(listener)
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_PLAY -> {
+                val uriString = intent.getStringExtra(EXTRA_URI)
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+                val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
+                
+                if (uriString != null) {
+                    playTrack(Uri.parse(uriString), title, artist)
+                }
+            }
+            ACTION_PAUSE -> pause()
+            ACTION_STOP -> stop()
+            ACTION_NEXT -> next()
+            ACTION_PREVIOUS -> previous()
+            ACTION_SEEK_TO -> {
+                val position = intent.getLongExtra(EXTRA_POSITION, 0L)
+                seekTo(position)
+            }
+        }
+        return START_STICKY
     }
 
-    fun setPlaybackList(items: List<MediaItem>) {
-        playbackList.clear()
-        playbackList.addAll(items)
-    }
-
-    fun playFromList(index: Int) {
-        if (index >= 0 && index < playbackList.size) {
-            currentIndex = index
-            playItem(playbackList[index])
+    fun playTrack(uri: Uri, title: String, artist: String) {
+        try {
+            currentMediaItem = MediaItem.fromUri(uri)
+            exoPlayer?.setMediaItem(currentMediaItem)
+            exoPlayer?.prepare()
+            exoPlayer?.play()
+            isPlaying = true
+            
+            updateNotification(title, artist, true)
+            notifyPlaybackStateChanged(true)
+            notifyTrackChanged(currentMediaItem)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+            notifyError(e.message ?: "Errore riproduzione")
         }
     }
 
-    fun playItem(mediaItem: MediaItem) {
-        currentMediaItem = mediaItem
-        currentIndex = playbackList.indexOf(mediaItem)
-        
-        exoPlayer?.setMediaItem(mediaItem)
-        exoPlayer?.prepare()
-        exoPlayer?.playWhenReady = true
-    }
-
     fun play() {
-        exoPlayer?.playWhenReady = true
+        exoPlayer?.play()
+        isPlaying = true
+        updateNotification(
+            currentMediaItem?.mediaMetadata?.title?.toString() ?: "",
+            currentMediaItem?.mediaMetadata?.artist?.toString() ?: "",
+            true
+        )
+        notifyPlaybackStateChanged(true)
     }
 
     fun pause() {
-        exoPlayer?.playWhenReady = false
+        exoPlayer?.pause()
+        isPlaying = false
+        updateNotification(
+            currentMediaItem?.mediaMetadata?.title?.toString() ?: "",
+            currentMediaItem?.mediaMetadata?.artist?.toString() ?: "",
+            false
+        )
+        notifyPlaybackStateChanged(false)
     }
 
     fun stop() {
         exoPlayer?.stop()
-        exoPlayer?.clearMediaItems()
+        isPlaying = false
+        currentIndex = -1
+        updateNotification("scariCANO", "Player fermato", false)
+        notifyPlaybackStateChanged(false)
     }
 
     fun next() {
-        if (playbackList.isNotEmpty() && currentIndex < playbackList.size - 1) {
-            currentIndex++
-            playItem(playbackList[currentIndex])
-        }
+        // Logic for next track would go here
+        // For now, just notify
+        notifyTrackChanged(currentMediaItem)
     }
 
     fun previous() {
-        if (playbackList.isNotEmpty() && currentIndex > 0) {
-            currentIndex--
-            playItem(playbackList[currentIndex])
-        }
+        // Logic for previous track would go here
+        notifyTrackChanged(currentMediaItem)
     }
 
     fun seekTo(position: Long) {
         exoPlayer?.seekTo(position)
+        currentPosition = position
+        notifyPlaybackPositionChanged(position)
     }
 
     fun getCurrentPosition(): Long {
@@ -250,116 +273,143 @@ class AudioService : Service(), Player.Listener {
         return exoPlayer?.duration ?: 0L
     }
 
-    fun isPlaying(): Boolean {
-        return exoPlayer?.isPlaying ?: false
+    fun isCurrentlyPlaying(): Boolean {
+        return isPlaying && exoPlayer?.isPlaying == true
     }
 
-    fun getCurrentMediaItem(): MediaItem? {
-        return currentMediaItem
+    private fun updateNotification(title: String, artist: String, isPlaying: Boolean) {
+        val displayText = if (title.isNotEmpty() || artist.isNotEmpty()) "$title - $artist" else "scariCANO"
+        val notification = createNotification("scariCANO", displayText, isPlaying)
+        notificationManager?.notify(NOTIFICATION_ID, notification)
     }
 
-    fun getCurrentIndex(): Int {
-        return currentIndex
-    }
-
-    fun setVolume(volume: Float) {
-        exoPlayer?.volume = volume.coerceIn(0f, 1f)
-    }
-
-    fun getVolume(): Float {
-        return exoPlayer?.volume ?: 1f
-    }
-
-    fun setPlaybackSpeed(speed: Float) {
-        exoPlayer?.setPlaybackSpeed(speed)
-    }
-
-    override fun onPlaybackStateChanged(state: Int) {
-        when (state) {
-            Player.STATE_READY -> {
-                isPlaying = exoPlayer?.isPlaying ?: false
-                notifyPlaybackStateChanged()
-                updateNotification()
-            }
-            Player.STATE_ENDED -> {
-                // Auto-play next track
-                next()
-            }
-            Player.STATE_IDLE -> {
-                isPlaying = false
-                notifyPlaybackStateChanged()
-            }
-        }
-    }
-
-    override fun onPositionDiscontinuity(reason: Int) {
-        // Handle position jumps
-    }
-
-    override fun onIsPlayingChanged(isPlaying: Boolean) {
-        this.isPlaying = isPlaying
-        notifyPlaybackStateChanged()
-        updateNotification()
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_PLAY -> play()
-            ACTION_PAUSE -> pause()
-            ACTION_NEXT -> next()
-            ACTION_PREVIOUS -> previous()
-            ACTION_STOP -> stop()
-        }
-        return START_STICKY
-    }
-
-    private fun notifyPlaybackStateChanged() {
+    private fun notifyPlaybackStateChanged(isPlaying: Boolean) {
         listeners.forEach { listener ->
             listener.onPlaybackStateChanged(isPlaying)
         }
     }
 
-    private fun notifyTrackChanged() {
+    private fun notifyTrackChanged(mediaItem: MediaItem?) {
         listeners.forEach { listener ->
-            listener.onTrackChanged(currentMediaItem)
+            listener.onTrackChanged(mediaItem)
         }
     }
 
-    private fun notifyPositionChanged() {
+    private fun notifyPlaybackPositionChanged(position: Long) {
         listeners.forEach { listener ->
-            listener.onPlaybackPositionChanged(currentPosition)
+            listener.onPlaybackPositionChanged(position)
         }
     }
 
-    private fun updateNotification() {
-        val title = currentMediaItem?.mediaMetadata?.title ?: "scariCANO"
-        val text = currentMediaItem?.mediaMetadata?.artist ?: "Nessun brano in riproduzione"
-        val notification = createNotification(title, text, 0)
-        notificationManager?.notify(NOTIFICATION_ID, notification)
+    private fun notifyError(error: String) {
+        listeners.forEach { listener ->
+            listener.onError(error)
+        }
+    }
+
+    fun addListener(listener: AudioListener) {
+        listeners.add(listener)
+    }
+
+    fun removeListener(listener: AudioListener) {
+        listeners.remove(listener)
+    }
+
+    // Player.Listener callbacks
+    override fun onPlaybackStateChanged(state: Int) {
+        when (state) {
+            Player.STATE_READY -> {
+                isPlaying = exoPlayer?.isPlaying == true
+                notifyPlaybackStateChanged(isPlaying)
+            }
+            Player.STATE_ENDED -> {
+                isPlaying = false
+                notifyPlaybackStateChanged(false)
+                // Auto-play next track would go here
+            }
+        }
+    }
+
+    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        isPlaying = playWhenReady
+        notifyPlaybackStateChanged(isPlaying)
+    }
+
+    override fun onPositionDiscontinuity(reason: Int) {
+        currentPosition = exoPlayer?.currentPosition ?: 0L
+        notifyPlaybackPositionChanged(currentPosition)
     }
 
     companion object {
         const val ACTION_PLAY = "com.scaricano.ACTION_PLAY"
         const val ACTION_PAUSE = "com.scaricano.ACTION_PAUSE"
+        const val ACTION_STOP = "com.scaricano.ACTION_STOP"
         const val ACTION_NEXT = "com.scaricano.ACTION_NEXT"
         const val ACTION_PREVIOUS = "com.scaricano.ACTION_PREVIOUS"
-        const val ACTION_STOP = "com.scaricano.ACTION_STOP"
+        const val ACTION_SEEK_TO = "com.scaricano.ACTION_SEEK_TO"
         
+        const val EXTRA_URI = "uri"
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_ARTIST = "artist"
+        const val EXTRA_POSITION = "position"
+
         fun startAudioService(context: Context) {
-            val intent = Intent(context, AudioService::class.java)
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_PLAY
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
         }
-        
+
         fun playTrack(context: Context, uri: Uri, title: String, artist: String) {
             val intent = Intent(context, AudioService::class.java).apply {
                 action = ACTION_PLAY
-                putExtra("uri", uri.toString())
-                putExtra("title", title)
-                putExtra("artist", artist)
+                putExtra(EXTRA_URI, uri.toString())
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun pause(context: Context) {
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_PAUSE
+            }
+            context.startService(intent)
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+
+        fun next(context: Context) {
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_NEXT
+            }
+            context.startService(intent)
+        }
+
+        fun previous(context: Context) {
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_PREVIOUS
+            }
+            context.startService(intent)
+        }
+
+        fun seekTo(context: Context, position: Long) {
+            val intent = Intent(context, AudioService::class.java).apply {
+                action = ACTION_SEEK_TO
+                putExtra(EXTRA_POSITION, position)
             }
             context.startService(intent)
         }

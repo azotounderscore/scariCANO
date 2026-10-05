@@ -74,6 +74,35 @@ class MainActivity: FlutterActivity() {
                     val isDir = if (uri != null) safHelper?.isDirectory(uri) else false
                     result.success(isDir)
                 }
+                "saveFileFromPath" -> {
+                    val localPath = call.argument<String>("localPath")
+                    val destinationUri = call.argument<String>("destinationUri")
+                    val fileName = call.argument<String>("fileName")
+                    
+                    if (localPath != null && destinationUri != null && fileName != null) {
+                        val success = safHelper?.saveFileFromPath(
+                            Uri.parse(destinationUri),
+                            localPath,
+                            fileName
+                        ) ?: false
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "Missing required arguments", null)
+                    }
+                }
+                "deleteFile" -> {
+                    val parentUri = call.argument<String>("parentUri")
+                    val fileName = call.argument<String>("fileName")
+                    
+                    if (parentUri != null && fileName != null) {
+                        val uri = Uri.parse(parentUri)
+                        val childUri = safHelper?.getChildUri(uri, fileName)
+                        val success = if (childUri != null) safHelper?.deleteFile(childUri) else false
+                        result.success(success)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "Missing required arguments", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -128,10 +157,6 @@ class MainActivity: FlutterActivity() {
                         result.error("INVALID_ARGUMENTS", "Missing downloadId", null)
                     }
                 }
-                "getDownloadStatus" -> {
-                    // This would require binding to the service
-                    result.success(null)
-                }
                 else -> result.notImplemented()
             }
         }
@@ -155,22 +180,30 @@ class MainActivity: FlutterActivity() {
                         result.error("INVALID_ARGUMENTS", "Missing uri", null)
                     }
                 }
+                "stop" -> {
+                    AudioService.stop(this)
+                    result.success(true)
+                }
                 "pause" -> {
-                    // Would need to bind to service
-                    result.success(null)
+                    AudioService.pause(this)
+                    result.success(true)
                 }
                 "next" -> {
-                    // Would need to bind to service
-                    result.success(null)
+                    AudioService.next(this)
+                    result.success(true)
                 }
                 "previous" -> {
-                    // Would need to bind to service
-                    result.success(null)
+                    AudioService.previous(this)
+                    result.success(true)
                 }
                 "seekTo" -> {
                     val position = call.argument<Long>("position")
-                    // Would need to bind to service
-                    result.success(null)
+                    if (position != null) {
+                        AudioService.seekTo(this, position)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "Missing position", null)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -190,7 +223,7 @@ class MainActivity: FlutterActivity() {
                     // Send URI back to Flutter
                     MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL).invokeMethod(
                         "onDirectorySelected",
-                        mapOf("uri" to uri.toString())
+                        it.toString()
                     )
                 }
             }
@@ -200,7 +233,7 @@ class MainActivity: FlutterActivity() {
                 uri?.let { 
                     MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, CHANNEL).invokeMethod(
                         "onFileCreated",
-                        mapOf("uri" to uri.toString())
+                        it.toString()
                     )
                 }
             }

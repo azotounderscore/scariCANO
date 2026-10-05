@@ -10,18 +10,17 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
-import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
  * Foreground service for handling file downloads in the background.
- * Supports HTTP/HTTPS downloads with progress updates.
+ * Supports HTTP/HTTPS downloads with progress updates and SAF integration.
  */
 class DownloadService : Service() {
     
@@ -170,20 +169,19 @@ class DownloadService : Service() {
                 updateNotificationForDownload(task)
                 
                 val safHelper = SafHelper(this)
-                val fileUri = safHelper.createFileInDirectory(
-                    this,
-                    destinationUri,
-                    fileName,
-                    SafHelper.MIME_TYPE_AUDIO
-                )
                 
-                if (fileUri == null) {
+                // Create file in destination directory
+                val documentFile = DocumentFile.fromTreeUri(this, destinationUri)
+                val newFile = documentFile?.createFile("audio/*", fileName)
+                
+                if (newFile == null) {
                     task.status = DownloadStatus.FAILED
                     task.error = "Impossibile creare il file"
                     notifyError(task)
                     return@Thread
                 }
                 
+                val fileUri = newFile.uri
                 val connection = URL(url).openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 30000
@@ -241,6 +239,7 @@ class DownloadService : Service() {
                 }
                 
             } catch (e: Exception) {
+                e.printStackTrace()
                 task.status = DownloadStatus.FAILED
                 task.error = e.message ?: "Errore sconosciuto"
                 notifyError(task)
@@ -349,9 +348,9 @@ class DownloadService : Service() {
         
         const val EXTRA_DOWNLOAD_ID = "download_id"
         const val EXTRA_URL = "url"
-        const val EXTRA_DESTINATION = "destination"
-        const val EXTRA_FILENAME = "filename"
-        
+        const val EXTRA_DESTINATION = "destination_uri"
+        const val EXTRA_FILENAME = "file_name"
+
         fun startDownloadService(context: Context, downloadId: String, url: String, destinationUri: Uri, fileName: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_START_DOWNLOAD
@@ -366,7 +365,7 @@ class DownloadService : Service() {
                 context.startService(intent)
             }
         }
-        
+
         fun cancelDownloadService(context: Context, downloadId: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_CANCEL_DOWNLOAD
@@ -374,7 +373,7 @@ class DownloadService : Service() {
             }
             context.startService(intent)
         }
-        
+
         fun pauseDownloadService(context: Context, downloadId: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_PAUSE_DOWNLOAD
@@ -382,7 +381,7 @@ class DownloadService : Service() {
             }
             context.startService(intent)
         }
-        
+
         fun resumeDownloadService(context: Context, downloadId: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_RESUME_DOWNLOAD
