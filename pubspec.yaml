@@ -1,0 +1,88 @@
+name: scariCANO
+description: App per gestione e download di musica con supporto USB OTG
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+
+  # HTTP & Download
+  dio: ^5.4.0
+  dio_http2_adapter: ^2.3.0
+  path_provider: ^2.1.1
+  
+  # YouTube
+  youtube_explode_dart: ^2.0.0
+
+  # Storage & SAF
+  saf: ^0.0.12
+  file_picker: ^6.1.1
+  permission_handler: ^11.1.0
+  
+  # Audio
+  audio_service: ^0.18.9
+  just_audio: ^0.9.34
+  audio_session: ^0.1.16
+
+  # Metadati & Conversione
+  flutter_ffmpeg: ^0.4.2
+  id3: ^1.0.0
+  
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # UI
+  flutter_svg: ^2.0.9
+  cached_network_image: ^3.3.0
+  flutter_spinkit: ^5.2.0
+  
+  # Impostazioni
+  shared_preferences: ^2.2.2
+  
+  # Localizzazione
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.18.1
+
+  # URL
+  url_launcher: ^6.2.2
+  
+  # Notifiche
+  flutter_local_notifications: ^16.1.2
+  
+  # Background tasks
+  workmanager: ^0.5.1
+
+  # Icons
+  cupertino_icons: ^1.0.6
+  material_design_icons_flutter: ^6.5.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+  
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500

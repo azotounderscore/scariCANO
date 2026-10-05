@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">scariCANO</string>
+    <string name="channel_download_name">Download</string>
+    <string name="channel_download_description">Download in corso</string>
+    <string name="channel_audio_name">Riproduzione audio</string>
+    <string name="channel_audio_description">Controlli riproduzione audio</string>
+</resources>

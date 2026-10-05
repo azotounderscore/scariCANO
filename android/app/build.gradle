@@ -1,0 +1,86 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+}
+
+android {
+    namespace "com.scaricano"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.scaricano"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+        
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            keyAlias System.getenv('ANDROID_KEY_ALIAS') ?: 'scariCANO'
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD') ?: 'changeit'
+            storeFile file(System.getenv('ANDROID_KEYSTORE_PATH') ?: 'release.keystore')
+            storePassword System.getenv('ANDROID_STORE_PASSWORD') ?: 'changeit'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+    
+    // Flutter dependencies
+    implementation 'io.flutter:flutter-embedding-android:1.0.0'
+    implementation 'io.flutter:flutter-embedding-engine:1.0.0'
+    
+    // SAF (Storage Access Framework)
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'androidx.exifinterface:exifinterface:1.3.6'
+    
+    // Download
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    
+    // Audio
+    implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.19.1'
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.19.1'
+    
+    // Notifications
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
